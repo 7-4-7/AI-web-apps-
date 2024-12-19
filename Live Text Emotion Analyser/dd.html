@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Text Sentiment Classification</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300..700&family=Lustria&family=Noto+Sans:ital,wght@0,100..900;1,100..900&family=Poiret+One&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f9f3f2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            font-family: 'Noto Sans', sans-serif;
+        }
+        .lustria {
+            font-family: 'Lustria', serif;
+        }
+        .scrollable-textarea {
+            background-color: #ffffff;
+            width: 60%;
+            height: 200px;
+            overflow-y: auto;
+            resize: none;
+            padding: 15px;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            border: 1px solid #ccc;
+            font-size: 16px;
+            color: #333;
+        }
+        .middle-container {
+            width: 100%;
+            max-width: 800px;
+            padding: 20px;
+            text-align: center;
+        }
+        .middle-container h1 {
+            font-family: 'Lustria', serif;
+            margin-bottom: 20px;
+            font-size: 32px;
+            color: #444;
+        }
+        #result {
+            margin-top: 20px;
+            font-size: 18px;
+            color: #333;
+            background-color: #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+            display: inline-block;
+            min-width: 200px;
+            transition: all 0.3s ease;
+        }
+        .error {
+            color: #ff4d4d;
+            background-color: #ffe6e6 !important;
+        }
+        .back-button {
+            margin-top: 20px;
+            color: #ffffff;
+            background-color: #ff5722;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .back-button:hover {
+            background-color: #e64a19;
+        }
+        .loading {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="middle-container">
+        <h1 class="lustria">Live Text Sentiment Classification</h1>
+        <textarea 
+            class="scrollable-textarea" 
+            id="scrollableTextArea" 
+            placeholder="Type here to analyze sentiment..."
+            aria-label="Text for sentiment analysis"></textarea>
+        <div id="result">Awaiting input...</div>
+        <button class="back-button" onclick="window.history.back()">Go Back</button>
+    </div>
+
+    <script>
+        const API_URL = 'http://127.0.0.1:5000/classify';  // Updated to match backend route
+        const textArea = document.getElementById('scrollableTextArea');
+        const resultDiv = document.getElementById('result');
+
+        function debounce(func, delay) {
+            let timeoutId;
+            return function () {
+                const context = this;
+                const args = arguments;
+                clearTimeout(timeoutId);
+                timeoutId = setTimeout(() => {
+                    func.apply(context, args);
+                }, delay);
+            };
+        }
+
+        async function classifyText(text) {
+            try {
+                resultDiv.innerHTML = "Analyzing...";
+                resultDiv.classList.add('loading');
+                
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text: text }),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                const result = data.result ? data.result[0] : data[0];
+                
+                resultDiv.innerHTML = `
+                    <strong>Emotion:</strong> ${result.label}<br>
+                    <strong>Confidence:</strong> ${(result.score * 100).toFixed(2)}%
+                `;
+                resultDiv.classList.remove('error', 'loading');
+            } catch (error) {
+                console.error('Error:', error);
+                resultDiv.textContent = `Error: ${error.message || 'Failed to classify text'}`;
+                resultDiv.classList.add('error');
+                resultDiv.classList.remove('loading');
+            }
+        }
+
+        const debouncedClassify = debounce(function () {
+            const text = textArea.value.trim();
+            if (text) {
+                classifyText(text);
+            } else {
+                resultDiv.innerHTML = "Awaiting input...";
+                resultDiv.classList.remove('error', 'loading');
+            }
+        }, 500);
+
+        textArea.addEventListener('input', debouncedClassify);
+    </script>
+</body>
+</html>
